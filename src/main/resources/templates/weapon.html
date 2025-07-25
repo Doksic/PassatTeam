@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Опис зброї на складі</title>
+    <link th:href="@{/css/bootstrap.min.css}" rel="stylesheet" />
+</head>
+<body>
+<div class="container">
+    <h1>Опис зброї на складі</h1>
+    <form th:action="@{/weapon/add}" th:object="${weapon}" method="post">
+        <table class="table">
+            <tr>
+                <td>Назва:</td>
+                <td><input type="text" th:field="*{name}" class="form-control" required /></td>
+            </tr>
+            <tr>
+                <td>Тип:</td>
+                <td><input type="text" th:field="*{type}" class="form-control" required /></td>
+            </tr>
+            <tr>
+                <td>Серійний номер:</td>
+                <td><input type="text" th:field="*{serialNumber}" class="form-control" required /></td>
+            </tr>
+            <tr>
+                <td>Кількість:</td>
+                <td><input type="number" th:field="*{quantity}" class="form-control" min="1" required /></td>
+            </tr>
+            <tr>
+                <td>Опис:</td>
+                <td><textarea th:field="*{description}" class="form-control"></textarea></td>
+            </tr>
+            <tr>
+                <td colspan="2"><button type="submit" class="btn btn-success">Додати зброю</button></td>
+            </tr>
+        </table>
+    </form>
+    <h2 class="mt-4">Список зброї</h2>
+    <table class="table table-bordered table-striped">
+        <thead class="thead-dark">
+            <tr>
+                <th>Назва</th>
+                <th>Тип</th>
+                <th>Серійний номер</th>
+                <th>Кількість</th>
+                <th>Опис</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="weapon : ${weapons}">
+                <td th:text="${weapon.name}">Назва</td>
+                <td th:text="${weapon.type}">Тип</td>
+                <td th:text="${weapon.serialNumber}">Серійний номер</td>
+                <td th:text="${weapon.quantity}">Кількість</td>
+                <td th:text="${weapon.description}">Опис</td>
+                <td>
+                    <a th:href="@{'/weapon/edit/' + ${weapon.serialNumber}}" class="btn btn-warning btn-sm">Редагувати</a>
+                    <a th:href="@{'/weapon/delete/' + ${weapon.serialNumber}}" class="btn btn-danger btn-sm" onclick="return confirm('Ви впевнені?')">Видалити</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
