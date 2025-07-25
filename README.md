@@ -20,18 +20,15 @@
 
 ## 📁 Структура проєкту
 
-
+```bash
 /weapon-inventory/
 ├── backend/ # Серверна частина (Node.js / Express / MongoDB)
 ├── frontend/ # Клієнтська частина (React або ін.)
 ├── models/ # Моделі зброї, користувача тощо
 ├── routes/ # API-маршрути
 ├── README.md
-└── ...
-
-yaml
-Копіювати
-Редагувати
+└── yamln
+````
 
 ---
 
