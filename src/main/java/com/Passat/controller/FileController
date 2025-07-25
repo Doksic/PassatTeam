@@ -1,0 +1,253 @@
+package com.example.Holidays.controller;
+
+import com.example.Holidays.model.Cadet;
+import com.example.Holidays.repository.CadetRepository;
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.List;
+
+@Controller
+public class FileController {
+
+    @Autowired
+    private CadetRepository repository;
+
+    private static final String FILE_PATH_PDF = "Cadets.pdf";
+    private static final String FILE_PATH_EXCEL = "Cadets.xlsx";
+
+    private enum TypeFile {
+        PDF,
+        EXCEL
+    }
+
+    private void createExcelFile(String filePath) throws IOException {
+        org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+        org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.createSheet("Cadet Data");
+
+        // Створення заголовку
+        String[] headers = {"Name", "Surname", "City"};
+        org.apache.poi.xssf.usermodel.XSSFRow headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            headerRow.createCell(i).setCellValue(headers[i]);
+        }
+
+        // Додавання даних курсантів
+        java.util.List<Cadet> cadets = repository.findAll();
+        int rowIndex = 1;
+
+        for (Cadet cadet : cadets) {
+            org.apache.poi.xssf.usermodel.XSSFRow row = sheet.createRow(rowIndex++);
+            row.createCell(0).setCellValue(cadet.getName());
+            row.createCell(1).setCellValue(cadet.getSurname());
+            row.createCell(2).setCellValue(cadet.getCity());
+        }
+
+        // Автоширина колонок
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        // Збереження файлу
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(filePath)) {
+            workbook.write(out);
+        }
+
+        workbook.close();
+    }
+
+    @GetMapping("/download/pdf")
+    public void downloadPdf(HttpServletResponse response) throws Exception {
+        generateFile(TypeFile.PDF);
+        downloadFile(response, FILE_PATH_PDF, "application/pdf");
+    }
+
+    @GetMapping("/download/excel")
+    public void downloadExcel(HttpServletResponse response) throws Exception {
+        generateFile(TypeFile.EXCEL);
+        downloadFile(response, FILE_PATH_EXCEL, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private void generateFile(TypeFile type) throws Exception {
+        List<Cadet> cadets = repository.findAll();
+
+        if (type == TypeFile.PDF) {
+            Document document = new Document();
+            PdfWriter.getInstance(document, new FileOutputStream(FILE_PATH_PDF));
+            document.open();
+
+            document.add(new Paragraph("Список кадетів"));
+            document.add(new Paragraph(" "));
+
+            PdfPTable table = new PdfPTable(3);
+            table.addCell("Name");
+            table.addCell("Surname");
+            table.addCell("City");
+
+            for (Cadet cadet : cadets) {
+                table.addCell(cadet.getName());
+                table.addCell(cadet.getSurname());
+                table.addCell(cadet.getCity());
+            }
+
+            document.add(table);
+            document.close();
+
+        } else if (type == TypeFile.EXCEL) {
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("Cadets");
+            Row header = sheet.createRow(0);
+
+            header.createCell(0).setCellValue("Name");
+            header.createCell(1).setCellValue("Surname");
+            header.createCell(2).setCellValue("City");
+
+            int rowCount = 1;
+            for (Cadet cadet : cadets) {
+                Row row = sheet.createRow(rowCount++);
+                row.createCell(0).setCellValue(cadet.getName());
+                row.createCell(1).setCellValue(cadet.getSurname());
+                row.createCell(2).setCellValue(cadet.getCity());
+            }
+
+            FileOutputStream outputStream = new FileOutputStream(FILE_PATH_EXCEL);
+            workbook.write(outputStream);
+            workbook.close();
+        }
+    }
+
+    private void downloadFile(HttpServletResponse response, String filePath, String contentType) throws IOException {
+        java.nio.file.Path file = java.nio.file.Paths.get(filePath);
+        response.setContentType(contentType);
+        response.setHeader("Content-Disposition", "attachment; filename=" + file.getFileName().toString());
+        java.nio.file.Files.copy(file, response.getOutputStream());
+        response.getOutputStream().flush();
+    }
+
+    private void doDownload(jakarta.servlet.http.HttpServletRequest request,
+                            jakarta.servlet.http.HttpServletResponse response,
+                            String filePath,
+                            TypeFile typeFile) throws IOException {
+        generateFile(typeFile);
+        java.nio.file.Path file = java.nio.file.Paths.get(filePath);
+        if (typeFile == TypeFile.PDF) {
+            response.setContentType("application/pdf");
+        } else if (typeFile == TypeFile.EXCEL) {
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        response.setHeader("Content-Disposition", "attachment; filename=" + file.getFileName().toString());
+        java.nio.file.Files.copy(file, response.getOutputStream());
+        response.getOutputStream().flush();
+    }
+
+    public void doDownload(jakarta.servlet.http.HttpServletRequest request,
+                          jakarta.servlet.http.HttpServletResponse response,
+                          String filePath,
+                          TypeFile typeFile) throws IOException {
+        // Генерація потрібного файлу
+        if (typeFile == TypeFile.PDF) {
+            createPDFFile(filePath);
+        } else if (typeFile == TypeFile.EXCEL) {
+            createExcelFile(filePath);
+        } else {
+            response.sendError(jakarta.servlet.http.HttpServletResponse.SC_BAD_REQUEST, "Unsupported file type");
+            return;
+        }
+
+        java.io.File downloadFile = new java.io.File(filePath);
+
+        if (!downloadFile.exists()) {
+            response.sendError(jakarta.servlet.http.HttpServletResponse.SC_NOT_FOUND, "File not found");
+            return;
+        }
+
+        // Встановлення MIME-типу вручну
+        String mimeType = "application/octet-stream";
+        if (typeFile == TypeFile.PDF) {
+            mimeType = "application/pdf";
+        } else if (typeFile == TypeFile.EXCEL) {
+            mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        }
+
+        response.setContentType(mimeType);
+        response.setContentLength((int) downloadFile.length());
+
+        // Заголовок Content-Disposition
+        String headerValue = "attachment; filename=\"" + downloadFile.getName() + "\"";
+        response.setHeader("Content-Disposition", headerValue);
+
+        int BUFFER_SIZE = 4096;
+        try (java.io.FileInputStream inputStream = new java.io.FileInputStream(downloadFile);
+             java.io.OutputStream outStream = response.getOutputStream()) {
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outStream.write(buffer, 0, bytesRead);
+            }
+        }
+    }
+}
+
+    private void createPDFFile(String filePath) throws IOException {
+        com.itextpdf.text.Document doc = new com.itextpdf.text.Document(com.itextpdf.text.PageSize.A4);
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(filePath)) {
+            com.itextpdf.text.pdf.PdfWriter.getInstance(doc, fos);
+            doc.open();
+
+            // Заголовок
+            com.itextpdf.text.Paragraph title = new com.itextpdf.text.Paragraph("Report", new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 14, com.itextpdf.text.Font.BOLD));
+            title.setAlignment(com.itextpdf.text.Element.ALIGN_CENTER);
+            doc.add(title);
+
+            // Дата / підзаголовок
+            com.itextpdf.text.Paragraph date = new com.itextpdf.text.Paragraph("from 07/28/23 to 08/08/23 cadets have a rest",
+                    new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.NORMAL));
+            date.setAlignment(com.itextpdf.text.Element.ALIGN_CENTER);
+            date.setSpacingAfter(10);
+            doc.add(date);
+
+            // Таблиця
+            com.itextpdf.text.pdf.PdfPTable table = new com.itextpdf.text.pdf.PdfPTable(3);
+            table.setWidthPercentage(100);
+            table.setSpacingBefore(10f);
+            table.setSpacingAfter(10f);
+
+            // Стилі для заголовка таблиці
+            com.itextpdf.text.Font headerFont = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 10, com.itextpdf.text.Font.BOLD);
+            com.itextpdf.text.BaseColor headerColor = new com.itextpdf.text.BaseColor(230, 230, 250); // світло-фіолетовий
+
+            com.itextpdf.text.pdf.PdfPCell cell1 = new com.itextpdf.text.pdf.PdfPCell(new com.itextpdf.text.Phrase("Name", headerFont));
+            com.itextpdf.text.pdf.PdfPCell cell2 = new com.itextpdf.text.pdf.PdfPCell(new com.itextpdf.text.Phrase("Surname", headerFont));
+            com.itextpdf.text.pdf.PdfPCell cell3 = new com.itextpdf.text.pdf.PdfPCell(new com.itextpdf.text.Phrase("City", headerFont));
+
+            cell1.setBackgroundColor(headerColor);
+            cell2.setBackgroundColor(headerColor);
+            cell3.setBackgroundColor(headerColor);
+
+            table.addCell(cell1);
+            table.addCell(cell2);
+            table.addCell(cell3);
+
+            // Заповнення даних
+            for (Cadet cadet : repository.findAll()) {
+                table.addCell(new com.itextpdf.text.pdf.PdfPCell(new com.itextpdf.text.Phrase(cadet.getName())));
+                table.addCell(new com.itextpdf.text.pdf.PdfPCell(new com.itextpdf.text.Phrase(cadet.getSurname())));
+                table.addCell(new com.itextpdf.text.pdf.PdfPCell(new com.itextpdf.text.Phrase(cadet.getCity())));
+            }
+
+            doc.add(table);
+        } catch (com.itextpdf.text.DocumentException e) {
+            e.printStackTrace();
+        } finally {
+            doc.close();
+        }
+    }
